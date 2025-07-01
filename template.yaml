@@ -1,0 +1,884 @@
+---
+Outputs:
+  MainUserpool:
+    Value:
+      Fn::GetAtt:
+      - "MainUserpool"
+      - "UserPoolId"
+    Description: "MainUserpool User Pool Id"
+  FrontendBucketName:
+    Value:
+      Ref: "FrontendBucket"
+    Description: "FrontendBucket Bucket Name"
+  Region:
+    Value:
+      Fn::Sub: "${AWS::Region}"
+    Description: "Region"
+  BackendBucketName:
+    Value:
+      Ref: "BackendBucket"
+    Description: "BackendBucket Bucket Name"
+  MainUserpoolClient:
+    Value:
+      Fn::GetAtt:
+      - "MainUserpoolClient"
+      - "ClientId"
+    Description: "MainUserpoolClient Client Id"
+  MainIdentityPool:
+    Value:
+      Fn::GetAtt:
+      - "MainIdentityPool"
+      - "Id"
+    Description: "MainIdentityPool Id"
+  MainAPIGateway:
+    Value:
+      Fn::Sub: "https://${MainAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+    Description: "MainAPIGateway APIGateway Prod Stage Endpoint"
+  MainCloudFrontDistributionId:
+    Value:
+      Ref: "CloudFrontDistribution"
+    Description: "CloudFrontDistribution Distribution Id"
+Metadata:
+  AWSToolsMetrics:
+    IaC_Generator: "arn:aws:cloudformation:ap-southeast-1:255327957584:generatedTemplate/26136d01-327e-4d88-8b9d-f724c6947a4a"
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: "Business card scanner web app\n"
+
+Parameters:
+  DomainName:
+    Default: "card.cmpapp.top"
+    Type: "String"
+    Description: "The domain name for the frontend S3 bucket."
+  ACMCertificateArn:
+    Default: "arn:aws:acm:us-east-1:255327957584:certificate/51f2f21b-15e2-4dac-8c75-79c6ef5634fb"
+    Type: "String"
+    Description: "The ARN of the ACM certificate for the CloudFront distribution."
+  DeepSeekApiKey:
+    Default: "ENTER_DEEPSEEK_API_KEY"
+    Type: "String"
+    Description: "The DeepSeek API key for the backend Lambda function."
+
+Resources:
+  BackendBucketBucketPolicy:
+    Properties:
+      Bucket:
+        Ref: "BackendBucket"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Resource:
+          - Fn::Sub: "arn:aws:s3:::${BackendBucket}/*"
+          Action: "s3:*"
+          Effect: "Allow"
+          Principal:
+            AWS:
+              Fn::GetAtt:
+              - "MainIdentityPoolIAMAuthRole"
+              - "Arn"
+    Metadata:
+      SamResourceId: "BackendBucketBucketPolicy"
+    Type: "AWS::S3::BucketPolicy"
+  MainUserpool:
+    Properties:
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      AutoVerifiedAttributes:
+      - "email"
+      UserPoolName:
+        Fn::Sub: "${AWS::StackName}-MainUserpool"
+      Schema:
+      - Required: false
+        Name: "email"
+        AttributeDataType: "String"
+    Metadata:
+      SamResourceId: "MainUserpool"
+    Type: "AWS::Cognito::UserPool"
+  MainFunctionDeleteContactPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/DELETE/contacts/*"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  MainFunctionGetVCardPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/GET/vcard/*"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  MainDynamoDBTable:
+    Properties:
+      BillingMode: "PAY_PER_REQUEST"
+      TableName:
+        Fn::Sub: "${AWS::StackName}-MainDynamoDBTable"
+      AttributeDefinitions:
+      - AttributeName: "userId"
+        AttributeType: "S"
+      - AttributeName: "cardId"
+        AttributeType: "S"
+      KeySchema:
+      - KeyType: "HASH"
+        AttributeName: "userId"
+      - KeyType: "RANGE"
+        AttributeName: "cardId"
+    Metadata:
+      SamResourceId: "MainDynamoDBTable"
+    Type: "AWS::DynamoDB::Table"
+  MainFunctionScanCardPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/POST/scan"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  BackendBucket:
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+        - ExposedHeaders:
+          - "ETag"
+          AllowedMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          AllowedOrigins:
+          - "*"
+          AllowedHeaders:
+          - "*"
+      BucketName:
+        Fn::Sub: "${AWS::StackName}-bucket"
+    Metadata:
+      SamResourceId: "BackendBucket"
+    Type: "AWS::S3::Bucket"
+  MainIdentityPoolIAMAuthRole:
+    Properties:
+      RoleName: "MainIdentityPoolIAMAuthRole"
+      Description: "A role for authenticated users"
+      Policies:
+      - PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Resource:
+              Fn::Sub: "arn:aws:s3:::${BackendBucket}/*"
+            Effect: "Allow"
+            Action:
+            - "s3:*"
+        PolicyName: "MainIdentityPoolIAMAuthRolePolicy"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Condition:
+            StringEquals:
+              cognito-identity.amazonaws.com:aud:
+                Ref: "MainIdentityPool"
+            ForAnyValue:StringLike:
+              cognito-identity.amazonaws.com:amr: "authenticated"
+          Effect: "Allow"
+          Action:
+          - "sts:AssumeRoleWithWebIdentity"
+          Principal:
+            Federated: "cognito-identity.amazonaws.com"
+    Metadata:
+      SamResourceId: "MainIdentityPoolIAMAuthRole"
+    Type: "AWS::IAM::Role"
+  MainFunctionGetImagePermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/GET/images/*"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+
+  MainFunction:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Handler: "app.lambda_handler"
+      Runtime: "python3.13"
+      MemorySize: 1024
+      Timeout: 900
+      Role:
+        Fn::GetAtt:
+          - "MainFunctionRole"
+          - "Arn"
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME:
+            Ref: "MainDynamoDBTable"
+          BACKEND_BUCKET_NAME:
+            Ref: "BackendBucket"
+          FRONTEND_BUCKET_NAME:
+            Ref: "FrontendBucket"
+          DEEPSEEK_API_KEY: !Ref "DeepSeekApiKey"
+          REGION:
+            Fn::Sub: "${AWS::Region}"
+      CodeUri: application/
+      Layers:
+        - !Ref "MainLayer"
+      Architectures:
+        - "x86_64"
+
+  MainLayer:
+    Type: "AWS::Serverless::LayerVersion"
+    Properties:
+      LayerName: "MainLayer"
+      Description: "main layer for the main function"
+      ContentUri: application/layer
+      CompatibleRuntimes:
+        - "python3.13"
+      LicenseInfo: "MIT"
+
+  MainIdentityPoolRoleAttachment:
+    Properties:
+      IdentityPoolId:
+        Ref: "MainIdentityPool"
+      Roles:
+        authenticated:
+          Fn::GetAtt:
+          - "MainIdentityPoolIAMAuthRole"
+          - "Arn"
+    Metadata:
+      SamResourceId: "MainIdentityPoolRoleAttachment"
+    Type: "AWS::Cognito::IdentityPoolRoleAttachment"
+  MainFunctionGetContactsPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/GET/contacts"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  MainUserpoolClient:
+    Properties:
+      GenerateSecret: false
+      ClientName:
+        Fn::Sub: "${AWS::StackName}-MainUserpoolClient"
+      UserPoolId:
+        Ref: "MainUserpool"
+    Metadata:
+      SamResourceId: "MainUserpoolClient"
+    Type: "AWS::Cognito::UserPoolClient"
+  MainFunctionRole:
+    Properties:
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      - "arn:aws:iam::aws:policy/AmazonTextractFullAccess"
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Resource:
+            - Fn::Sub:
+              - "arn:${AWS::Partition}:s3:::${bucketName}/*"
+              - bucketName:
+                  Ref: "BackendBucket"
+            Action:
+            - "s3:GetObject"
+            - "s3:GetObjectAcl"
+            - "s3:GetObjectVersion"
+            - "s3:PutObject"
+            - "s3:PutObjectAcl"
+            - "s3:DeleteObject"
+            - "s3:DeleteObjectTagging"
+            - "s3:DeleteObjectVersionTagging"
+            - "s3:GetObjectTagging"
+            - "s3:GetObjectVersionTagging"
+            - "s3:PutObjectTagging"
+            - "s3:PutObjectVersionTagging"
+            Effect: "Allow"
+          - Resource:
+            - Fn::Sub:
+              - "arn:${AWS::Partition}:s3:::${bucketName}"
+              - bucketName:
+                  Ref: "BackendBucket"
+            Action:
+            - "s3:ListBucket"
+            - "s3:GetBucketLocation"
+            - "s3:GetLifecycleConfiguration"
+            - "s3:PutLifecycleConfiguration"
+            Effect: "Allow"
+        PolicyName: "MainFunctionRolePolicy0"
+      - PolicyDocument:
+          Statement:
+          - Resource:
+            - Fn::Sub:
+              - "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${tableName}"
+              - tableName:
+                  Ref: "MainDynamoDBTable"
+            - Fn::Sub:
+              - "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${tableName}/index/*"
+              - tableName:
+                  Ref: "MainDynamoDBTable"
+            Action:
+            - "dynamodb:GetItem"
+            - "dynamodb:DeleteItem"
+            - "dynamodb:PutItem"
+            - "dynamodb:Scan"
+            - "dynamodb:Query"
+            - "dynamodb:UpdateItem"
+            - "dynamodb:BatchWriteItem"
+            - "dynamodb:BatchGetItem"
+            - "dynamodb:DescribeTable"
+            - "dynamodb:ConditionCheckItem"
+            Effect: "Allow"
+        PolicyName: "MainFunctionRolePolicy1"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Action:
+          - "sts:AssumeRole"
+          Effect: "Allow"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+      Tags:
+      - Value: "SAM"
+        Key: "lambda:createdBy"
+    Type: "AWS::IAM::Role"
+  MainFunctionUpdateContactPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/PUT/contacts/*"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  MainFunctionDeleteAllContactsPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/DELETE/contacts"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  CloudFrontDistribution:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::CloudFront::Distribution"
+    DeletionPolicy: "Retain"
+    Properties:
+      DistributionConfig:
+        Logging:
+          IncludeCookies: false
+          Bucket: ""
+          Prefix: ""
+        Comment: "Business Card Scanner CDN"
+        DefaultRootObject: "index.html"
+        Origins:
+        - ConnectionTimeout: 10
+          OriginAccessControlId:
+            Ref: "CloudFrontOriginAccessControl"
+          ConnectionAttempts: 3
+          OriginCustomHeaders: []
+          DomainName: !Sub "${DomainName}.s3.${AWS::Region}.amazonaws.com"
+          OriginShield:
+            Enabled: false
+          S3OriginConfig:
+            OriginAccessIdentity: ""
+          OriginPath: ""
+          Id: !Sub "${DomainName}.s3.${AWS::Region}.amazonaws.com"
+        ViewerCertificate:
+          MinimumProtocolVersion: "TLSv1.2_2021"
+          SslSupportMethod: "sni-only"
+          AcmCertificateArn: !Ref ACMCertificateArn
+        PriceClass: "PriceClass_All"
+        DefaultCacheBehavior:
+          Compress: true
+          FunctionAssociations: []
+          LambdaFunctionAssociations: []
+          TargetOriginId: !Sub "${DomainName}.s3.${AWS::Region}.amazonaws.com"
+          ViewerProtocolPolicy: "allow-all"
+          GrpcConfig:
+            Enabled: false
+          TrustedSigners: []
+          FieldLevelEncryptionId: ""
+          TrustedKeyGroups: []
+          AllowedMethods:
+          - "HEAD"
+          - "GET"
+          CachedMethods:
+          - "HEAD"
+          - "GET"
+          SmoothStreaming: false
+          CachePolicyId:
+            Ref: "CloudFrontCachePolicy"
+        Staging: false
+        CustomErrorResponses: []
+        ContinuousDeploymentPolicyId: ""
+        OriginGroups:
+          Quantity: 0
+          Items: []
+        Enabled: true
+        Aliases:
+        - !Ref DomainName
+        IPV6Enabled: true
+        WebACLId: ""
+        HttpVersion: "http2"
+        Restrictions:
+          GeoRestriction:
+            Locations: []
+            RestrictionType: "none"
+        CacheBehaviors: []
+  MainFunctionGetNetworkPermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/GET/network"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  MainFunctionChatMessagePermissionProd:
+    Properties:
+      FunctionName:
+        Ref: "MainFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub:
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/POST/chat"
+        - __Stage__: "*"
+          __ApiId__:
+            Ref: "MainAPIGateway"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  CloudFrontCachePolicy:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::CloudFront::CachePolicy"
+    DeletionPolicy: "Retain"
+    Properties:
+      CachePolicyConfig:
+        Comment: "Policy with caching enabled. Supports Gzip and Brotli compression."
+        MinTTL: 1
+        MaxTTL: 3.1536E7
+        ParametersInCacheKeyAndForwardedToOrigin:
+          QueryStringsConfig:
+            QueryStringBehavior: "none"
+          EnableAcceptEncodingBrotli: true
+          HeadersConfig:
+            HeaderBehavior: "none"
+          CookiesConfig:
+            CookieBehavior: "none"
+          EnableAcceptEncodingGzip: true
+        DefaultTTL: 86400
+        Name: "Managed-CachingOptimized"
+  MainIdentityPool:
+    Properties:
+      IdentityPoolName:
+        Fn::Sub: "${AWS::StackName}-MainIdentityPool"
+      CognitoIdentityProviders:
+      - ClientId:
+          Ref: "MainUserpoolClient"
+        ProviderName:
+          Fn::GetAtt:
+          - "MainUserpool"
+          - "ProviderName"
+      AllowUnauthenticatedIdentities: false
+    Metadata:
+      SamResourceId: "MainIdentityPool"
+    Type: "AWS::Cognito::IdentityPool"
+  MainAPIGateway:
+    Metadata:
+      SamResourceId: "MainAPIGateway"
+    Properties:
+      Body:
+        paths:
+          /scan:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+                timeoutInMillis: 60000
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+          /chat:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+          /vcard/{cardId}:
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+          /network:
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+          /images/{cardId}:
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+          /contacts/{cardId}:
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+            delete:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+            put:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+          /contacts:
+            options:
+              summary: "CORS support"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Max-Age:
+                      type: "integer"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+                  description: "Default response for CORS method"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                responses:
+                  default:
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Max-Age: "'3600'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+                      method.response.header.Access-Control-Allow-Origin:
+                        Fn::Sub: "'https://${DomainName}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                    statusCode: "200"
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+              consumes:
+              - "application/json"
+            delete:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainFunction.Arn}/invocations"
+        swagger: "2.0"
+        info:
+          title:
+            Ref: "AWS::StackName"
+      Parameters:
+        endpointConfigurationTypes: "REGIONAL"
+      EndpointConfiguration:
+        Types:
+        - "REGIONAL"
+    Type: "AWS::ApiGateway::RestApi"
+  MainAPIGatewayProdStage:
+    Properties:
+      RestApiId:
+        Ref: "MainAPIGateway"
+      StageName: "Prod"
+      DeploymentId:
+        Ref: "MainAPIGatewayDeployment85e5af559a"
+    Type: "AWS::ApiGateway::Stage"
+  MainAPIGatewayDeployment85e5af559a:
+    Properties:
+      RestApiId:
+        Ref: "MainAPIGateway"
+      StageName: "Stage"
+      Description: "RestApi deployment id: 85e5af559ab2d439e74a01276084bb6619d1d6d9"
+    Type: "AWS::ApiGateway::Deployment"
+  CloudFrontOriginAccessControl:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::CloudFront::OriginAccessControl"
+    DeletionPolicy: "Retain"
+    Properties:
+      OriginAccessControlConfig:
+        SigningBehavior: "always"
+        Description: ""
+        SigningProtocol: "sigv4"
+        OriginAccessControlOriginType: "s3"
+        Name: !Sub "${DomainName}.s3.${AWS::Region}.amazonaws.com"
+  FrontendBucket:
+    Properties:
+      BucketName:
+        Ref: "DomainName"
+    Metadata:
+      SamResourceId: "FrontendBucket"
+    Type: "AWS::S3::Bucket"

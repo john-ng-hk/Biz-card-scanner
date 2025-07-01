@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Awsome Card Scanner v1.0.0</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.1/flowbite.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@5.2.3/dist/amazon-cognito-identity.min.js"></script>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">Awsome Card Scanner v1.0.0</h1>
+            <p class="text-lg">Digitize, organize, and analyze your professional network</p>
+            <button id="signOutBtn" class="btn-primary px-4 py-2 rounded hidden">Sign Out</button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="border-b border-gray-300 flex mb-8">
+            <button id="scanTab" class="px-4 py-2 font-medium tab-active">Scan Cards</button>
+            <button id="contactsTab" class="px-4 py-2 font-medium">My Contacts</button>
+            <button id="networkTab" class="px-4 py-2 font-medium">Network Analysis</button>
+        </div>
+
+        <!-- Scan Tab Content -->
+        <div id="scanContent" class="fade-in">
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold mb-2">Scan Business Cards</h2>
+                <p class="mb-4">Upload images of business cards to scan</p>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <label for="fileUpload" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded cursor-pointer">
+                        Upload Images
+                    </label>
+                    <input type="file" id="fileUpload" accept="image/*" multiple class="hidden">
+                    <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded hidden">Reset</button>
+                </div>
+                <div id="uploadProgress" class="text-sm mb-4"></div>
+                <div id="thumbnailGallery" class="thumbnail-container"></div>
+                <div id="scanCompleteMessage" class="hidden bg-green-50 text-green-700 p-4 rounded-lg mt-6 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span>All cards processed! Go to <a href="#" id="goToContacts" class="font-medium hover:underline">My Contacts</a> to view and edit them</span>
+                    </div>
+                    <button id="resetBtn" class="text-green-600 hover:text-green-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts Tab Content -->
+        <div id="contactsContent" class="hidden fade-in">
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Contacts</h2>
+                    <div class="flex space-x-2">
+                        <button id="downloadAllBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span>Download All</span>
+                        </button>
+                        <button id="deleteAllBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                            Delete All
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-4 mb-4">
+                    <div class="relative">
+                        <input type="text" id="searchContacts" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Search contacts...">
+                    </div>
+                    <select id="filterByTag" class="form-select px-3 py-2 rounded-md text-base">
+                        <option value="">All Tags</option>
+                    </select>
+                    <select id="filterByIndustry" class="form-select px-3 py-2 rounded-md text-base">
+                        <option value="">All Industries</option>
+                    </select>
+                    <select id="sortContacts" class="form-select px-3 py-2 rounded-md text-base">
+                        <option value="nameAsc">Name (A-Z)</option>
+                        <option value="nameDesc">Name (Z-A)</option>
+                        <option value="companyAsc">Company (A-Z)</option>
+                        <option value="companyDesc">Company (Z-A)</option>
+                        <option value="dateDesc">Date Added (Newest)</option>
+                        <option value="dateAsc">Date Added (Oldest)</option>
+                    </select>
+                </div>
+                <div id="contactsList" class="grid grid-cols-1"></div>
+                <div id="noContacts" class="text-center py-8 hidden">
+                    <p class="text-lg">No contacts found. Scan a business card to add your first contact.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Analysis Tab Content -->
+        <div id="networkContent" class="hidden fade-in">
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold mb-2">Network Intelligence Dashboard</h2>
+                <p class="text-gray-600 mb-4">Gain actionable insights from your professional connections</p>
+                
+                <!-- Dashboard Overview Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500 dashboard-card">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">Total Contacts</p>
+                                <h3 id="totalContactsCount" class="text-2xl font-bold">0</h3>
+                            </div>
+                            <div class="bg-blue-100 p-2 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span id="contactsGrowth" class="text-sm text-green-500">+0% from last month</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500 dashboard-card">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">Companies</p>
+                                <h3 id="uniqueCompaniesCount" class="text-2xl font-bold">0</h3>
+                            </div>
+                            <div class="bg-purple-100 p-2 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span id="topIndustry" class="text-sm text-gray-600">Most common: Technology</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500 dashboard-card">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 flex items-center">
+                                    Connection Strength
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </p>
+                                <h3 id="connectionStrength" class="text-2xl font-bold">0%</h3>
+                            </div>
+                            <div class="bg-green-100 p-2 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span id="connectionTip" class="text-sm text-gray-600">Add more contacts to improve</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-yellow-500 dashboard-card">
+                        <div class="flex items-center justify-between">
+                <div>
+                                <p class="text-sm text-gray-500 flex items-center">
+                                    Network Reach
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </p>
+                                <h3 id="networkReach" class="text-2xl font-bold">0</h3>
+                            </div>
+                            <div class="bg-yellow-100 p-2 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span id="reachMetric" class="text-sm text-gray-600">Potential connections</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Network Visualization -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md p-4 h-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-lg">Network Visualization</h3>
+                            <div class="flex space-x-2">
+                                <select id="networkViewType" class="form-select text-sm px-2 py-1 rounded border border-gray-300">
+                                    <option value="company">Group by Company</option>
+                                    <option value="industry">Group by Industry</option>
+                                    <option value="location">Group by Location</option>
+                                </select>
+                                <button id="fullscreenNetworkBtn" class="bg-gray-200 hover:bg-gray-300 p-1 rounded">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="networkGraph" class="h-80 w-full"></div>
+                        <div class="mt-3 text-sm text-gray-600">
+                            <p><span class="font-medium">Tip:</span> Drag nodes to explore connections. Hover for details.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Insights Panel -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                        <h3 class="font-semibold text-lg mb-3">Key Insights</h3>
+                        <div id="keyInsights" class="space-y-4">
+                            <div class="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <h4 class="font-medium text-blue-700 flex items-center">
+                                    Network Diversity
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </h4>
+                                <p id="diversityScore" class="mt-1 text-sm text-gray-700">Add more contacts to see diversity score</p>
+                            </div>
+                            <div class="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                <h4 class="font-medium text-purple-700">Connection Opportunities</h4>
+                                <p id="connectionOpportunities" class="mt-1 text-sm text-gray-700">Add more contacts to see opportunities</p>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg border border-green-100">
+                                <h4 class="font-medium text-green-700">Networking Recommendation</h4>
+                                <p id="networkingRecommendation" class="mt-1 text-sm text-gray-700">Add more contacts to get personalized recommendations</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Analytics Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <!-- Company Distribution -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h3 class="font-semibold text-lg mb-4">Company Distribution</h3>
+                    <div id="companyDistributionChart" class="h-64"></div>
+                    <div id="topCompanies" class="mt-4 space-y-2">
+                        <div class="text-center py-4 text-gray-500">Add more contacts to see company distribution</div>
+                    </div>
+                </div>
+                
+                <!-- Industry Insights -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h3 class="font-semibold text-lg mb-4">Industry Insights</h3>
+                    <div id="industryInsightsChart" class="h-64"></div>
+                    <div id="clusterStats" class="mt-4 space-y-2">
+                        <div class="text-center py-4 text-gray-500">Add more contacts to see industry insights</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Items -->
+            <div class="bg-white rounded-lg shadow-md p-4 mt-6">
+                <h3 class="font-semibold text-lg mb-3">Recommended Actions</h3>
+                <div id="actionItems" class="space-y-3">
+                    <div class="flex items-start p-3 border border-gray-200 rounded-lg">
+                        <div class="bg-blue-100 p-2 rounded-full mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4v-5z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium">Expand Your Network</h4>
+                            <p class="text-sm text-gray-600 mt-1">Add more contacts from different industries to increase your network diversity.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start p-3 border border-gray-200 rounded-lg">
+                        <div class="bg-green-100 p-2 rounded-full mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                            </svg>
+                </div>
+                <div>
+                            <h4 class="font-medium">Connect Similar Contacts</h4>
+                            <p class="text-sm text-gray-600 mt-1">Introduce contacts from similar industries to strengthen your network.</p>
+                        </div>
+                    </div>
+                    <div id="customActionItem" class="flex items-start p-3 border border-gray-200 rounded-lg">
+                        <div class="bg-purple-100 p-2 rounded-full mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium">Organize Your Contacts</h4>
+                            <p class="text-sm text-gray-600 mt-1">Group your contacts by company or industry for better organization.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sign-In Modal -->
+        <div id="signInModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="modal-content rounded-lg max-w-md w-full p-6">
+                <h3 class="text-xl font-semibold mb-4">Sign In</h3>
+                <form id="signInForm" class="space-y-4">
+                    <div>
+                        <label for="username" class="block mb-1 font-medium">Username</label>
+                        <input type="text" id="username" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Username" required>
+                    </div>
+                    <div>
+                        <label for="password" class="block mb-1 font-medium">Password</label>
+                        <input type="password" id="password" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn-primary px-4 py-2 rounded w-full">Sign In</button>
+                </form>
+                <p id="signInError" class="text-red-500 mt-4 hidden"></p>
+            </div>
+        </div>
+
+        <!-- Edit Contact Modal -->
+        <div id="editContactModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+            <div class="modal-content rounded-lg w-full max-w-md bg-white flex flex-col max-h-[90vh] overflow-hidden">
+                <!-- Sticky Header -->
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                    <h3 class="text-xl font-semibold text-gray-900">Edit Contact</h3>
+                    <button type="button" id="closeEditModal" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Scrollable Content -->
+                <div class="flex-1 overflow-y-auto px-6 py-4">
+                <form id="editContactForm" class="space-y-4">
+                    <input type="hidden" id="editCardId">
+                    <div>
+                            <label for="editName" class="block mb-1 font-medium text-gray-700">Name</label>
+                        <input type="text" id="editName" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Name">
+                    </div>
+                    <div>
+                            <label for="editCompany" class="block mb-1 font-medium text-gray-700">Company</label>
+                        <input type="text" id="editCompany" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Company">
+                    </div>
+                        <div class="mb-4">
+                            <label for="editDepartment" class="block text-sm font-medium text-gray-700">Department</label>
+                            <input type="text" id="editDepartment" name="department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div class="mb-4">
+                            <label for="editIndustry" class="block text-sm font-medium text-gray-700">Industry</label>
+                            <select id="editIndustry" name="industry" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <option value="">Select Industry</option>
+                                <option value="Technology">Technology</option>
+                                <option value="Healthcare">Healthcare</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Manufacturing">Manufacturing</option>
+                                <option value="Retail">Retail</option>
+                                <option value="Education">Education</option>
+                                <option value="Government">Government</option>
+                                <option value="Non-Profit">Non-Profit</option>
+                                <option value="Media">Media</option>
+                                <option value="Transportation">Transportation</option>
+                                <option value="Energy">Energy</option>
+                                <option value="Agriculture">Agriculture</option>
+                                <option value="Construction">Construction</option>
+                                <option value="Hospitality">Hospitality</option>
+                                <option value="Legal">Legal</option>
+                                <option value="Consulting">Consulting</option>
+                                <option value="Real Estate">Real Estate</option>
+                                <option value="Telecommunications">Telecommunications</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    <div>
+                            <label for="editTitle" class="block mb-1 font-medium text-gray-700">Title</label>
+                        <input type="text" id="editTitle" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Title">
+                    </div>
+                    <div>
+                            <label for="editEmail" class="block mb-1 font-medium text-gray-700">Email</label>
+                        <input type="email" id="editEmail" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Email">
+                    </div>
+                    <div>
+                            <label for="editPhone" class="block mb-1 font-medium text-gray-700">Phone</label>
+                        <input type="tel" id="editPhone" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="Phone">
+                    </div>
+                    <div>
+                            <label for="editAddress" class="block mb-1 font-medium text-gray-700">Address</label>
+                        <textarea id="editAddress" class="form-textarea w-full px-3 py-2 rounded-md text-base" rows="2" placeholder="Address"></textarea>
+                    </div>
+                    <div>
+                            <label for="editWebsite" class="block mb-1 font-medium text-gray-700">Website</label>
+                        <input type="text" id="editWebsite" class="form-input w-full px-3 py-2 rounded-md text-base" placeholder="example.com">
+                    </div>
+                        <div>
+                            <label for="editDateAdded" class="block mb-1 font-medium text-gray-700">Date Added</label>
+                            <input type="date" id="editDateAdded" class="form-input w-full px-3 py-2 rounded-md text-base">
+                            <p class="text-sm text-gray-500 mt-1">When this contact was added to your collection</p>
+                    </div>
+                </form>
+                </div>
+
+                <!-- Sticky Footer -->
+                <div class="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3 z-10">
+                    <button type="button" id="cancelEditBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Cancel
+                    </button>
+                    <button type="submit" form="editContactForm" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete All Contacts Confirmation Modal -->
+        <div id="deleteAllModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="modal-content rounded-lg max-w-md w-full p-6 bg-white">
+                <h3 class="text-xl font-semibold mb-4 text-red-600">Delete All Contacts</h3>
+                <p class="mb-6 text-gray-700">Are you sure you want to delete all your contacts? This action cannot be undone.</p>
+                <div class="flex justify-end gap-3">
+                    <button id="cancelDeleteAllBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Cancel</button>
+                    <button id="confirmDeleteAllBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Delete All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded shadow-lg hidden">
+            <span id="toastMessage">Contact saved successfully!</span>
+        </div>
+
+        <!-- Chat Button -->
+        <button id="chatButton" class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition-all duration-200 hover:scale-110 z-40">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+        </button>
+
+        <!-- Chat Window -->
+        <div id="chatWindow" class="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-lg shadow-xl hidden z-50 flex flex-col">
+            <!-- Chat Header -->
+            <div class="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
+                <h3 class="font-semibold">Contact Database Assistant</h3>
+                <button id="closeChat" class="text-white hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Chat Messages -->
+            <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Messages will be added here dynamically -->
+            </div>
+
+            <!-- Chat Input -->
+            <form id="chatForm" class="p-4 border-t">
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ask about your contacts...">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.1/flowbite.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
