@@ -172,3 +172,6 @@ Key Component Interactions:
    - CloudWatch Logs for Lambda function
    - S3 access logs for bucket monitoring
    - API Gateway metrics for endpoint performance
+
+## Contact
+feel free to connect me on LinkedIn:  https://www.linkedin.com/in/john-nch-hk/
