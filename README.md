@@ -3,7 +3,7 @@
 The Business Card Scanner is a web application that transforms physical business cards into organized digital contacts using AI-powered text extraction and analysis. It helps professionals efficiently manage their network by automatically extracting contact information, categorizing companies by industry, and providing network intelligence through interactive visualizations.
 
 The application combines AWS services with the DeepSeek API to deliver a comprehensive contact management solution. Key features include:
-- Automated information extraction from business card images using Amazon Textract and DeepSeek AI
+- Automated information extraction from business card images using Amazon Textract and DeepSeek AI (or other AI)
 - Secure user authentication and data storage with AWS Cognito and DynamoDB
 - Interactive network analysis dashboard showing company connections and industry insights
 - Quickly download contacts and integrate with your local mobile contact book
